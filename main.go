@@ -3,111 +3,105 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
-func findslashn(input string) []string {
-	result := []string{}
-	str := ""
-	for i := 0; i < len(input)-1; i++ {
-		if input[i] == '\\' && input[i+1] == 'n' {
-			if i == 0 {
-				result = append(result, "")
-				i++
-			}else {
-				if i < len(input)-3  && input[i+2] == '\\' && input[i+3] == 'n'{
-					if str != "" {
-						result = append(result, str)
-						str = ""
-						result = append(result, "")
-						i += 3
-					}
-				}else {
-					if str != "" {
-						result = append(result, str)
-						str = ""
-						i+=1
-					}
-				}
-			}
-		} else {
-			str += string(input[i])
-		}
-	}
-	if input[len(input)-1] != 'n' {
-		str += string(input[len(input)-1])
-	}else {
-		if input[len(input)-2] != '\\' {
-			str += string(input[len(input)-1])
-		}else {
-			result = append(result, "")
-		}
-	}
-	if str != "" {
-		result = append(result, str)
-		str = ""
-	}
-
-	return result
+type Banner struct {
+	filePath   string
+	lineHeight int
 }
 
-func ascii(fil []byte, input string) string {
-	cheker := 0
-	rr := 0
-	str := ""
-	for j := 0; j < 8; j++ {
-		for k := 0; k < len(input); k++ {
-			rr = int(rune(input[k])) - 32
-			cheker = j
-			for i := 1; i < len(fil)-1; i++ {
-				if fil[i] == '\n' && fil[i+1] == '\n' {
-					rr--
-					i++
-				}
-				if rr == 0 {
-					if cheker == -1 {
-						if fil[i] != '\n' {
-							str += string(fil[i])
-							// fmt.Print(str)
-						} else {
-							break
-						}
-					} else {
-						if fil[i] == '\n' {
-							cheker--
-						}
-					}
-				}
-			}
-		}
-		str += "\n"
-	}
-	return str
+var banners = map[string]Banner{
+	"thinkertoy": {"banners/thinkertoy.txt", 8},
+	"standard":   {"banners/standard.txt", 8},
+	"shadow":     {"banners/shadow.txt", 8},
+	"phoenix":    {"banners/phoenix.txt", 7},
+	"blocks":     {"banners/blocks.txt", 11},
+	"arob":       {"banners/arob.txt", 8},
+	"coins":      {"banners/coins.txt", 8},
+	"fire":       {"banners/fire.txt", 9},
+	"jacky":      {"banners/jacky.txt", 8},
+	"small":      {"banners/small.txt", 5},
 }
 
 func main() {
-	fil, _ := os.ReadFile("standard.txt")
-
-	input := os.Args[1]
-	aa := findslashn(input)
-//	fmt.Println(aa)
-	 result := ""
-	for i := 0; i < len(aa); i++ {
-		if aa[i] == "" {
-			result+="\n"
-			
-		}else {
-			result+=(ascii(fil, aa[i]))
-			
-		}
-		//fmt.Println(ascii(fil, aa[i]))
-		// result = ascii(fil, input)
-		//  err := os.WriteFile("expl.txt", []byte(result), 0777)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// 7 7 7
-		// 7 = 4 + 2 + 1
-		// f = r + w + E
+	var input, bannerName, outputFile string
+	args := os.Args[1:]
+	if len(args) < 1 || len(args) > 3 {
+		fmt.Println("Usage: go run main.go [OPTION] [STRING] [BANNER]")
+		return
 	}
-	fmt.Print(result)
+	if strings.HasPrefix(args[0], "--output=") {
+		parts := strings.SplitN(args[0], "=", 2)
+		if len(parts) != 2 {
+			fmt.Println("Invalid flag format. Use: --output=<filename>")
+			return
+		}
+		outputFile = parts[1]
+		args = args[1:]
+	}
+	if len(args) == 1 {
+		input = args[0]
+		bannerName = "standard"
+	} else if len(args) == 2 {
+		input = args[0]
+		bannerName = args[1]
+	}
+	banner, exists := banners[bannerName]
+	if !exists {
+		fmt.Printf("Error: Banner '%s' not found.\n", bannerName)
+		return
+	}
+	processedLines := handleNewlines(input)
+	asciiArt := generateAsciiArt(processedLines, banner)
+
+	if outputFile != "" {
+		err := os.WriteFile(outputFile, []byte(asciiArt), 0664)
+		if err != nil {
+			fmt.Println("Error writing to file:", err)
+		}
+	} else {
+		fmt.Print(asciiArt)
+	}
+}
+
+func handleNewlines(input string) []string {
+	return strings.Split(input, "\\n")
+}
+
+func generateAsciiArt(lines []string, banner Banner) string {
+	result := ""
+	for _, line := range lines {
+		if line == "" {
+			result += "\n"
+			continue
+		}
+		result += processLine(line, banner)
+	}
+	return result
+}
+
+func processLine(line string, banner Banner) string {
+	result := ""
+	for i := 1; i <= banner.lineHeight; i++ {
+		res := ""
+		for _, letter := range line {
+			res += getLine(1+int(letter-32)*(banner.lineHeight+1)+i, banner.filePath)
+		}
+		result += res + "\n"
+	}
+	return result
+}
+
+func getLine(num int, filePath string) string {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Println("Error reading banner file:", err)
+		os.Exit(1)
+	}
+	lines := strings.Split(string(content), "\n")
+	if num-1 < len(lines) {
+		return strings.ReplaceAll(lines[num-1], "\r", "")
+	}
+	return ""
 }
